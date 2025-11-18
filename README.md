@@ -37,8 +37,7 @@ ai-form-filling-assistant/
 │
 ├── docs/
 │   ├── architecture.md
-│   ├── api-spec.md
-│   └── roadmap.md
+│   └── api-spec.md
 │
 ├── frontend/
 │
@@ -64,14 +63,4 @@ Run server:
 ```bash
 uvicorn app.main:app --reload
 ```
-
-## 🎯 Roadmap
-
-- [ ] Initial MVP: Screenshot → Form JSON
-- [ ] Page HTML parsing for selectors
-- [ ] Multi-step wizards
-- [ ] Auto-detection of required fields
-- [ ] Save user profiles for auto-fill
-- [ ] Browser plugin version
-
 
