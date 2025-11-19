@@ -87,7 +87,8 @@ class AutomationService:
         
         try:
             await page.goto(url, wait_until="domcontentloaded", timeout=self.timeout)
-            await page.wait_for_timeout(2000)
+            await page.wait_for_load_state("networkidle", timeout=10000)
+            await page.wait_for_timeout(1000)
             
             for label, value in form_data.items():
                 try:
@@ -97,8 +98,16 @@ class AutomationService:
                         errors.append(f"Field not found: {label}")
                         continue
                     
+                    await field.scroll_into_view_if_needed()
+                    await page.wait_for_timeout(200)
+                    
                     tag_name = await field.evaluate("el => el.tagName.toLowerCase()")
                     field_type = await field.get_attribute("type") or ""
+                    
+                    is_visible = await field.is_visible()
+                    if not is_visible:
+                        errors.append(f"Field '{label}' is not visible")
+                        continue
                     
                     if tag_name == "select":
                         await field.select_option(value)
