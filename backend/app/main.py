@@ -4,11 +4,14 @@ Main FastAPI application for AI Form Filling Assistant
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
+from app.api.profile_routes import router as profile_router
+from app.database import init_db
+import asyncio
 
 app = FastAPI(
     title="AI Form Filling Assistant",
     description="AI-powered automation tool for filling web forms using Vision and UI Automation",
-    version="1.0.0"
+    version="2.0.0"
 )
 
 app.add_middleware(
@@ -20,6 +23,13 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix="/api")
+app.include_router(profile_router, prefix="/api")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on startup"""
+    await init_db()
 
 
 @app.get("/")
