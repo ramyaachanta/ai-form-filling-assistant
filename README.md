@@ -40,6 +40,11 @@ ai-form-filling-assistant/
 │   └── api-spec.md
 │
 ├── frontend/
+│   ├── src/
+│   │   ├── api/          # API client
+│   │   ├── components/   # React components
+│   │   └── App.jsx       # Main app
+│   └── package.json
 │
 ├── media/
 │   ├── architecture-system.png
@@ -49,6 +54,8 @@ ai-form-filling-assistant/
 ```
 
 ## 🏁 Getting Started
+
+### Backend Setup
 
 Install backend dependencies:
 
@@ -63,4 +70,35 @@ Run server:
 ```bash
 uvicorn app.main:app --reload
 ```
+
+The API will be available at `http://localhost:8000`
+
+### Frontend Setup
+
+Install frontend dependencies:
+
+```bash
+cd frontend
+npm install
+```
+
+Set up environment variables (create `.env` file):
+
+```env
+VITE_API_URL=http://localhost:8000
+```
+
+Run development server:
+
+```bash
+npm run dev
+```
+
+The frontend will be available at `http://localhost:5173`
+
+### Full Stack
+
+1. Start the backend server (port 8000)
+2. Start the frontend dev server (port 5173)
+3. Open `http://localhost:5173` in your browser
 
