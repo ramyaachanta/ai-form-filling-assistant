@@ -1,6 +1,3 @@
-"""
-Vision Service using GPT-4o Vision API for form analysis
-"""
 from openai import OpenAI
 from app.config import settings
 import base64
@@ -10,21 +7,11 @@ import asyncio
 
 
 class VisionService:
-    """Service for analyzing forms using GPT-4o Vision"""
     
     def __init__(self):
         self.client = OpenAI(api_key=settings.openai_api_key)
     
     async def analyze_form(self, image_bytes: bytes) -> Dict[str, Any]:
-        """
-        Analyze form screenshot and extract form fields
-        
-        Args:
-            image_bytes: Image file as bytes
-        
-        Returns:
-            Dictionary with form structure and fields
-        """
         base64_image = base64.b64encode(image_bytes).decode('utf-8')
         
         prompt = """Analyze this form screenshot and extract all form fields. 

@@ -9,6 +9,26 @@ const apiClient = axios.create({
   },
 });
 
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const analyzeForm = async (file, url = null) => {
   const formData = new FormData();
   if (file) {
@@ -41,13 +61,8 @@ export const fillForm = async (requestData) => {
   return response.data;
 };
 
-export const getProfiles = async () => {
-  const response = await apiClient.get('/api/profiles');
-  return response.data;
-};
-
-export const getProfile = async (id) => {
-  const response = await apiClient.get(`/api/profiles/${id}`);
+export const getMyProfile = async () => {
+  const response = await apiClient.get('/api/profiles/me');
   return response.data;
 };
 
@@ -56,19 +71,85 @@ export const createProfile = async (profileData) => {
   return response.data;
 };
 
-export const updateProfile = async (id, profileData) => {
-  const response = await apiClient.put(`/api/profiles/${id}`, profileData);
+export const updateProfile = async (profileData) => {
+  const response = await apiClient.put('/api/profiles/me', profileData);
   return response.data;
 };
 
-export const deleteProfile = async (id) => {
-  const response = await apiClient.delete(`/api/profiles/${id}`);
+export const deleteProfile = async () => {
+  const response = await apiClient.delete('/api/profiles/me');
   return response.data;
 };
 
 export const healthCheck = async () => {
   const response = await apiClient.get('/api/health');
   return response.data;
+};
+
+export const uploadResume = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  const token = localStorage.getItem('auth_token');
+  const response = await axios.post(
+    `${API_BASE_URL}/api/profiles/me/resume`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${token}`,
+      },
+    }
+  );
+  return response.data;
+};
+
+export const register = async (email, password) => {
+  const response = await apiClient.post('/api/auth/register', {
+    email,
+    password,
+  });
+  return response.data;
+};
+
+export const login = async (email, password) => {
+  const formData = new FormData();
+  formData.append('username', email);
+  formData.append('password', password);
+  
+  const response = await axios.post(
+    `${API_BASE_URL}/api/auth/login`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    }
+  );
+  
+  if (response.data.access_token) {
+    localStorage.setItem('auth_token', response.data.access_token);
+  }
+  
+  return response.data;
+};
+
+export const getCurrentUser = async () => {
+  const response = await apiClient.get('/api/auth/me');
+  if (response.data) {
+    localStorage.setItem('user', JSON.stringify(response.data));
+  }
+  return response.data;
+};
+
+export const logout = () => {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('user');
+  window.location.href = '/login';
+};
+
+export const isAuthenticated = () => {
+  return !!localStorage.getItem('auth_token');
 };
 
 export default apiClient;

@@ -1,14 +1,26 @@
 import { useState, useEffect } from 'react';
-import { fillForm, getProfiles } from '../api/client';
-import ProfileManager from './ProfileManager';
+import { fillForm, getMyProfile } from '../api/client';
 
 export default function FormFiller({ formData, url }) {
-  const [selectedProfileId, setSelectedProfileId] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [customData, setCustomData] = useState({});
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [useProfile, setUseProfile] = useState(true);
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      const data = await getMyProfile();
+      setProfile(data);
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  };
 
   useEffect(() => {
     if (formData && formData.fields) {
@@ -38,9 +50,7 @@ export default function FormFiller({ formData, url }) {
         multi_step: true,
       };
 
-      if (useProfile && selectedProfileId) {
-        requestData.profile_id = selectedProfileId;
-      } else {
+      if (!useProfile || !profile) {
         requestData.form_data = customData;
       }
 
@@ -91,10 +101,22 @@ export default function FormFiller({ formData, url }) {
 
         {useProfile ? (
           <div className="mb-6">
-            <ProfileManager
-              onSelectProfile={setSelectedProfileId}
-              selectedProfileId={selectedProfileId}
-            />
+            {profile ? (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <span className="font-medium">Using profile:</span> {profile.name}
+                  {profile.resume_path && (
+                    <span className="ml-2 text-green-600">✓ Resume available</span>
+                  )}
+                </p>
+              </div>
+            ) : (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  No profile found. Please create a profile first.
+                </p>
+              </div>
+            )}
           </div>
         ) : (
           <div className="mb-6">
@@ -160,7 +182,7 @@ export default function FormFiller({ formData, url }) {
 
         <button
           onClick={handleFill}
-          disabled={loading || (useProfile && !selectedProfileId) || !url}
+          disabled={loading || (useProfile && !profile) || !url}
           className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
         >
           {loading ? 'Filling Form...' : 'Fill Form'}

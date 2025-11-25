@@ -1,6 +1,3 @@
-"""
-Simple script to run the FastAPI server
-"""
 import uvicorn
 from app.config import settings
 

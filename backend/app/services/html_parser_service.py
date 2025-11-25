@@ -1,6 +1,3 @@
-"""
-HTML Parser Service for extracting form fields from HTML
-"""
 from bs4 import BeautifulSoup
 import httpx
 from typing import Dict, List, Any, Optional
@@ -8,21 +5,11 @@ import re
 
 
 class HTMLParserService:
-    """Service for parsing HTML forms and extracting field structure"""
     
     def __init__(self):
         self.client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
     
     async def fetch_html(self, url: str) -> str:
-        """
-        Fetch HTML content from URL
-        
-        Args:
-            url: URL to fetch
-        
-        Returns:
-            HTML content as string
-        """
         try:
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -34,16 +21,6 @@ class HTMLParserService:
             raise Exception(f"Failed to fetch HTML from {url}: {str(e)}")
     
     def parse_form_fields(self, html: str, url: str = "") -> Dict[str, Any]:
-        """
-        Parse HTML and extract form fields
-        
-        Args:
-            html: HTML content
-            url: Source URL (for resolving relative paths)
-        
-        Returns:
-            Dictionary with form structure
-        """
         soup = BeautifulSoup(html, 'lxml')
         
         forms = soup.find_all('form')
@@ -68,16 +45,6 @@ class HTMLParserService:
         }
     
     def _extract_field_info(self, element, base_url: str = "") -> Optional[Dict[str, Any]]:
-        """
-        Extract field information from HTML element
-        
-        Args:
-            element: BeautifulSoup element
-            base_url: Base URL for resolving relative paths
-        
-        Returns:
-            Dictionary with field and action info
-        """
         tag_name = element.name.lower()
         
         field_type = element.get('type', 'text').lower()
@@ -119,7 +86,6 @@ class HTMLParserService:
         }
     
     def _find_label_text(self, element, field_id: str, name: str) -> str:
-        """Find associated label text for a form field"""
         label_text = ""
         
         if field_id:
@@ -143,7 +109,6 @@ class HTMLParserService:
         return label_text.strip()
     
     def _determine_field_type(self, tag: str, input_type: str, name: str, label: str) -> str:
-        """Determine field type from various attributes"""
         if tag == 'select':
             return 'select'
         if tag == 'textarea':
@@ -169,7 +134,6 @@ class HTMLParserService:
         return 'text'
     
     def _generate_selector(self, element, field_id: str, name: str) -> str:
-        """Generate CSS selector for the field"""
         if field_id:
             return f"#{field_id}"
         if name:
@@ -177,15 +141,6 @@ class HTMLParserService:
         return ""
     
     async def analyze_form_from_url(self, url: str) -> Dict[str, Any]:
-        """
-        Analyze form from URL
-        
-        Args:
-            url: URL of the form page
-        
-        Returns:
-            Dictionary with form structure
-        """
         try:
             html = await self.fetch_html(url)
             form_structure = self.parse_form_fields(html, url)
@@ -200,6 +155,5 @@ class HTMLParserService:
             raise Exception(f"HTML parsing error: {str(e)}")
     
     async def close(self):
-        """Close HTTP client"""
         await self.client.aclose()
 

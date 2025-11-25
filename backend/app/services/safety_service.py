@@ -1,6 +1,3 @@
-"""
-Safety Service for form filling preview and confirmation
-"""
 from typing import Dict, List, Any
 from app.services.automation_service import AutomationService
 from app.utils.field_validator import FieldValidator
@@ -8,7 +5,6 @@ from app.utils.field_matcher import FieldMatcher
 
 
 class SafetyService:
-    """Service for safety checks and preview before form filling"""
     
     def __init__(self):
         self.automation_service = AutomationService()
@@ -16,17 +12,6 @@ class SafetyService:
         self.matcher = FieldMatcher()
     
     async def preview_actions(self, url: str, form_data: Dict[str, Any], form_structure: Dict[str, Any] = None) -> Dict[str, Any]:
-        """
-        Preview actions that will be performed
-        
-        Args:
-            url: URL of the form
-            form_data: Data to fill
-            form_structure: Optional form structure (if not provided, will be fetched)
-        
-        Returns:
-            Preview of actions with validation results
-        """
         if not form_structure:
             from app.services.html_parser_service import HTMLParserService
             html_parser = HTMLParserService()
@@ -68,7 +53,6 @@ class SafetyService:
         }
     
     def _generate_warnings(self, form_data: Dict[str, Any], fields: List[Dict[str, Any]]) -> List[str]:
-        """Generate warnings for potential issues"""
         warnings = []
         
         required_fields = [f for f in fields if f.get('required', False)]
@@ -83,16 +67,6 @@ class SafetyService:
         return warnings
     
     async def dry_run(self, url: str, form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Perform dry run - detect fields without filling
-        
-        Args:
-            url: URL of the form
-            form_data: Data that would be filled
-        
-        Returns:
-            Dry run results
-        """
         from app.services.html_parser_service import HTMLParserService
         html_parser = HTMLParserService()
         

@@ -68,7 +68,11 @@ playwright install
 Run server:
 
 ```bash
-uvicorn app.main:app --reload
+# Option 1: Using python -m (Recommended)
+python3 -m uvicorn app.main:app --reload
+
+# Option 2: Using run.py script
+python3 run.py
 ```
 
 The API will be available at `http://localhost:8000`

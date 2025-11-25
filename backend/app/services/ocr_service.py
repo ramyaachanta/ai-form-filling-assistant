@@ -1,38 +1,34 @@
-"""
-OCR Service for fallback text extraction when Vision API fails
-"""
-import easyocr
 from PIL import Image
 import io
+import numpy as np
 from typing import Dict, Any
 import json
 import re
 import asyncio
 
+if not hasattr(Image, 'ANTIALIAS'):
+    if hasattr(Image, 'Resampling'):
+        Image.ANTIALIAS = Image.Resampling.LANCZOS
+    elif hasattr(Image, 'LANCZOS'):
+        Image.ANTIALIAS = Image.LANCZOS
+
+import easyocr
+
 
 class OCRService:
-    """Service for OCR-based form analysis as fallback"""
     
     def __init__(self):
         self.reader = easyocr.Reader(['en'], gpu=False)
     
     async def analyze_form(self, image_bytes: bytes) -> Dict[str, Any]:
-        """
-        Analyze form using OCR to extract text and infer form structure
-        
-        Args:
-            image_bytes: Image file as bytes
-        
-        Returns:
-            Dictionary with form structure extracted via OCR
-        """
         try:
             image = Image.open(io.BytesIO(image_bytes))
+            image_array = np.array(image)
             
             loop = asyncio.get_event_loop()
             results = await loop.run_in_executor(
                 None,
-                lambda: self.reader.readtext(image)
+                lambda: self.reader.readtext(image_array)
             )
             
             extracted_text = []

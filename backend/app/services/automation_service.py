@@ -1,6 +1,3 @@
-"""
-Automation Service using Playwright for form filling
-"""
 from playwright.async_api import async_playwright, Page, Browser
 from app.config import settings
 from typing import Dict, Any, List
@@ -8,7 +5,6 @@ import asyncio
 
 
 class AutomationService:
-    """Service for automating form filling using Playwright"""
     
     def __init__(self):
         self.browser: Browser = None
@@ -16,7 +12,6 @@ class AutomationService:
         self.timeout = settings.playwright_timeout
     
     async def _get_browser(self) -> Browser:
-        """Get or create browser instance"""
         if self.browser is None:
             playwright = await async_playwright().start()
             try:
@@ -32,16 +27,6 @@ class AutomationService:
         return self.browser
     
     async def _find_field_by_label(self, page: Page, label: str) -> Any:
-        """
-        Find form field by label text
-        
-        Args:
-            page: Playwright page object
-            label: Label text to search for
-        
-        Returns:
-            Element handle or None
-        """
         strategies = [
             f"//label[contains(text(), '{label}')]/following-sibling::input[1]",
             f"//label[contains(text(), '{label}')]/following-sibling::select[1]",
@@ -69,16 +54,6 @@ class AutomationService:
         return None
     
     async def fill_form(self, url: str, form_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Fill form using automation
-        
-        Args:
-            url: URL of the form page
-            form_data: Dictionary mapping field labels to values
-        
-        Returns:
-            Result dictionary with success status and details
-        """
         browser = await self._get_browser()
         page = await browser.new_page()
         
@@ -151,7 +126,6 @@ class AutomationService:
             await page.close()
     
     async def close(self):
-        """Close browser instance"""
         if self.browser:
             await self.browser.close()
             self.browser = None

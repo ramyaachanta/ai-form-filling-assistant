@@ -37,3 +37,9 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
+# Resumes
+resumes/
+*.pdf
+*.docx
+*.doc
+

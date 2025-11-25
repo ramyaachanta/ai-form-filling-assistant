@@ -1,6 +1,3 @@
-"""
-API routes for form analysis and automation
-"""
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from typing import Optional
@@ -15,6 +12,7 @@ from app.services.profile_service import ProfileService
 from app.utils.field_validator import FieldValidator
 from app.utils.field_matcher import FieldMatcher
 from app.database import get_db
+from app.api.auth_routes import get_current_user
 from sqlalchemy.ext.asyncio import AsyncSession
 import io
 
@@ -22,23 +20,19 @@ router = APIRouter()
 
 
 class FillFormRequest(BaseModel):
-    """Request model for form filling"""
     url: Optional[str] = None
     form_data: Optional[dict] = None
     screenshot_path: Optional[str] = None
     skip_validation: bool = False
     multi_step: bool = False
-    profile_id: Optional[str] = None
 
 
 class AnalyzeRequest(BaseModel):
-    """Request model for form analysis"""
     url: Optional[str] = None
 
 
 @router.get("/health")
 async def health_check():
-    """Health check endpoint"""
     return {"status": "healthy", "service": "ai-form-filling-assistant"}
 
 
@@ -47,20 +41,6 @@ async def analyze_form(
     file: Optional[UploadFile] = File(None),
     url: Optional[str] = None
 ):
-    """
-    Analyze a form and return structured form fields
-    
-    Can analyze from:
-    - URL (HTML parsing) - preferred
-    - Screenshot (Vision API + OCR fallback)
-    
-    Args:
-        file: Optional screenshot image file
-        url: Optional URL of the form page
-    
-    Returns:
-        JSON structure with detected form fields
-    """
     try:
         if url and not file:
             html_parser = HTMLParserService()
@@ -83,8 +63,10 @@ async def analyze_form(
             except Exception as e:
                 print(f"Vision API failed: {e}, falling back to OCR")
                 ocr_service = OCRService()
-                form_structure = await ocr_service.analyze_form(image_bytes)
-                return JSONResponse(content=form_structure)
+                ocr_result = await ocr_service.analyze_form(image_bytes)
+                if isinstance(ocr_result, dict) and "form_structure" in ocr_result:
+                    return JSONResponse(content=ocr_result["form_structure"])
+                return JSONResponse(content=ocr_result)
         
         raise HTTPException(status_code=400, detail="Either URL or file must be provided")
             
@@ -96,15 +78,6 @@ async def analyze_form(
 
 @router.post("/preview")
 async def preview_form(request: FillFormRequest):
-    """
-    Preview form filling actions without executing
-    
-    Args:
-        request: FillFormRequest with url and form_data
-    
-    Returns:
-        Preview of actions with validation results
-    """
     try:
         if not request.url:
             raise HTTPException(status_code=400, detail="URL is required")
@@ -123,15 +96,6 @@ async def preview_form(request: FillFormRequest):
 
 @router.post("/dry-run")
 async def dry_run_form(request: FillFormRequest):
-    """
-    Perform dry run - detect fields without filling
-    
-    Args:
-        request: FillFormRequest with url and form_data
-    
-    Returns:
-        Dry run results
-    """
     try:
         if not request.url:
             raise HTTPException(status_code=400, detail="URL is required")
@@ -151,38 +115,25 @@ async def dry_run_form(request: FillFormRequest):
 @router.post("/fill")
 async def fill_form(
     request: FillFormRequest,
+    current_user = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Fill a form using automation
-    
-    Supports:
-    - Profile-based filling (use profile_id)
-    - Multi-step forms (use multi_step=true)
-    - Direct form data (use form_data)
-    
-    Args:
-        request: FillFormRequest with url, form_data, profile_id, multi_step options
-        db: Database session
-    
-    Returns:
-        Success status and execution details
-    """
     try:
         if not request.url:
             raise HTTPException(status_code=400, detail="URL is required for form filling")
         
         form_data = request.form_data.copy() if request.form_data else {}
         
-        if request.profile_id:
-            profile = await ProfileService.get_profile(db, request.profile_id)
-            if not profile:
-                raise HTTPException(status_code=404, detail="Profile not found")
-            profile_data = ProfileService.profile_to_form_data(profile)
-            form_data.update(profile_data)
+        if not form_data:
+            profile = await ProfileService.get_profile_by_user_id(db, current_user.id)
+            if profile:
+                profile_data = ProfileService.profile_to_form_data(profile)
+                form_data.update(profile_data)
+            else:
+                raise HTTPException(status_code=400, detail="No profile found. Please create your profile first.")
         
         if not form_data:
-            raise HTTPException(status_code=400, detail="Either form_data or profile_id must be provided")
+            raise HTTPException(status_code=400, detail="Form data is required")
         
         if not request.skip_validation:
             html_parser = HTMLParserService()
@@ -230,8 +181,7 @@ async def fill_form(
                 multi_step_service = MultiStepService()
                 result = await multi_step_service.fill_multi_step_form(page, form_data)
                 result["url"] = request.url
-                if request.profile_id:
-                    result["profile_id"] = request.profile_id
+                result["profile_used"] = True
             finally:
                 await page.close()
         else:

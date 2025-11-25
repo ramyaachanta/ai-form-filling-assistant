@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
 import {
-  getProfiles,
+  getMyProfile,
   createProfile,
   updateProfile,
   deleteProfile,
+  uploadResume,
 } from '../api/client';
 
 export default function ProfileManager({ onSelectProfile, selectedProfileId }) {
-  const [profiles, setProfiles] = useState([]);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editingProfile, setEditingProfile] = useState(null);
+  const [uploadingResume, setUploadingResume] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -20,16 +21,33 @@ export default function ProfileManager({ onSelectProfile, selectedProfileId }) {
   });
 
   useEffect(() => {
-    loadProfiles();
+    loadProfile();
   }, []);
 
-  const loadProfiles = async () => {
+  const loadProfile = async () => {
     try {
       setLoading(true);
-      const data = await getProfiles();
-      setProfiles(data);
+      const data = await getMyProfile();
+      setProfile(data);
+      if (data) {
+        setFormData({
+          name: data.name || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          address: typeof data.address === 'string' 
+            ? data.address 
+            : data.address?.full || '',
+          additional_data: data.additional_data || {},
+        });
+      }
     } catch (error) {
-      console.error('Error loading profiles:', error);
+      console.error('Error loading profile:', error);
+      if (error.response?.status === 404) {
+        setProfile(null);
+        setShowForm(true);
+      } else {
+        alert('Error loading profile: ' + (error.response?.data?.detail || error.message));
+      }
     } finally {
       setLoading(false);
     }
@@ -38,44 +56,26 @@ export default function ProfileManager({ onSelectProfile, selectedProfileId }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (editingProfile) {
-        await updateProfile(editingProfile.id, formData);
+      if (profile) {
+        await updateProfile(formData);
       } else {
         await createProfile(formData);
       }
-      await loadProfiles();
+      await loadProfile();
       setShowForm(false);
-      setEditingProfile(null);
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        address: '',
-        additional_data: {},
-      });
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert('Error saving profile');
+      const errorMessage = error.response?.data?.detail || error.message || 'Error saving profile';
+      alert(`Error saving profile: ${errorMessage}`);
     }
   };
 
-  const handleEdit = (profile) => {
-    setEditingProfile(profile);
-    setFormData({
-      name: profile.name,
-      email: profile.email || '',
-      phone: profile.phone || '',
-      address: profile.address || '',
-      additional_data: profile.additional_data || {},
-    });
-    setShowForm(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this profile?')) {
+  const handleDelete = async () => {
+    if (window.confirm('Are you sure you want to delete your profile? This cannot be undone.')) {
       try {
-        await deleteProfile(id);
-        await loadProfiles();
+        await deleteProfile();
+        setProfile(null);
+        setShowForm(true);
       } catch (error) {
         console.error('Error deleting profile:', error);
         alert('Error deleting profile');
@@ -83,10 +83,33 @@ export default function ProfileManager({ onSelectProfile, selectedProfileId }) {
     }
   };
 
+  const handleResumeUpload = async (file) => {
+    if (!file) return;
+    
+    const fileExt = file.name.split('.').pop().toLowerCase();
+    if (!['pdf', 'docx', 'doc'].includes(fileExt)) {
+      alert('Please upload a PDF or DOCX file');
+      return;
+    }
+    
+    try {
+      setUploadingResume(true);
+      const result = await uploadResume(file);
+      alert('Resume uploaded and parsed successfully!');
+      await loadProfile();
+    } catch (error) {
+      console.error('Error uploading resume:', error);
+      alert('Error uploading resume: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setUploadingResume(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="text-center py-8">
         <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p className="mt-2 text-gray-600">Loading profiles...</p>
       </div>
     );
   }
@@ -95,29 +118,34 @@ export default function ProfileManager({ onSelectProfile, selectedProfileId }) {
     <div className="w-full max-w-4xl mx-auto">
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">User Profiles</h2>
-          <button
-            onClick={() => {
-              setShowForm(!showForm);
-              setEditingProfile(null);
-              setFormData({
-                name: '',
-                email: '',
-                phone: '',
-                address: '',
-                additional_data: {},
-              });
-            }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-          >
-            {showForm ? 'Cancel' : '+ New Profile'}
-          </button>
+          <h2 className="text-2xl font-bold text-gray-800">My Profile</h2>
+          {profile && (
+            <button
+              onClick={() => {
+                setShowForm(!showForm);
+                if (!showForm) {
+                  setFormData({
+                    name: profile.name || '',
+                    email: profile.email || '',
+                    phone: profile.phone || '',
+                    address: typeof profile.address === 'string' 
+                      ? profile.address 
+                      : profile.address?.full || '',
+                    additional_data: profile.additional_data || {},
+                  });
+                }
+              }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            >
+              {showForm ? 'Cancel' : 'Edit Profile'}
+            </button>
+          )}
         </div>
 
         {showForm && (
           <form onSubmit={handleSubmit} className="mb-6 p-4 bg-gray-50 rounded-lg">
             <h3 className="text-lg font-semibold mb-4">
-              {editingProfile ? 'Edit Profile' : 'Create Profile'}
+              {profile ? 'Edit Profile' : 'Create Profile'}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -179,7 +207,6 @@ export default function ProfileManager({ onSelectProfile, selectedProfileId }) {
                 type="button"
                 onClick={() => {
                   setShowForm(false);
-                  setEditingProfile(null);
                 }}
                 className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
               >
@@ -189,87 +216,98 @@ export default function ProfileManager({ onSelectProfile, selectedProfileId }) {
                 type="submit"
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                {editingProfile ? 'Update' : 'Create'}
+                {profile ? 'Update' : 'Create'}
               </button>
             </div>
           </form>
         )}
 
-        <div className="space-y-3">
-          {profiles.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">
-              No profiles yet. Create one to get started!
-            </div>
-          ) : (
-            profiles.map((profile) => (
-              <div
-                key={profile.id}
-                className={`border rounded-lg p-4 hover:border-blue-500 transition ${
-                  selectedProfileId === profile.id
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <h3 className="font-semibold text-gray-800">
-                        {profile.name}
-                      </h3>
-                      {selectedProfileId === profile.id && (
-                        <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded">
-                          Selected
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      {profile.email && (
-                        <p>
-                          <span className="font-medium">Email:</span>{' '}
-                          {profile.email}
-                        </p>
-                      )}
-                      {profile.phone && (
-                        <p>
-                          <span className="font-medium">Phone:</span>{' '}
-                          {profile.phone}
-                        </p>
-                      )}
-                      {profile.address && (
-                        <p>
-                          <span className="font-medium">Address:</span>{' '}
-                          {profile.address}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    {onSelectProfile && (
-                      <button
-                        onClick={() => onSelectProfile(profile.id)}
-                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        Select
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleEdit(profile)}
-                      className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(profile.id)}
-                      className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
+        {!showForm && profile && (
+          <div className="border rounded-lg p-6 bg-gray-50">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                  {profile.name}
+                </h3>
               </div>
-            ))
-          )}
-        </div>
+              <div className="text-sm text-gray-600 space-y-2">
+                {profile.email && (
+                  <p>
+                    <span className="font-medium">Email:</span> {profile.email}
+                  </p>
+                )}
+                {profile.phone && (
+                  <p>
+                    <span className="font-medium">Phone:</span> {profile.phone}
+                  </p>
+                )}
+                {profile.address && (
+                  <p>
+                    <span className="font-medium">Address:</span>{' '}
+                    {typeof profile.address === 'string' 
+                      ? profile.address 
+                      : profile.address?.full || JSON.stringify(profile.address)}
+                  </p>
+                )}
+                {profile.resume_path && (
+                  <p className="text-green-600">
+                    <span className="font-medium">✓ Resume:</span> Uploaded
+                  </p>
+                )}
+                {profile.resume_data && profile.resume_data.skills && profile.resume_data.skills.length > 0 && (
+                  <div>
+                    <p className="font-medium mb-2">Skills ({profile.resume_data.skills.length}):</p>
+                    <div className="flex flex-wrap gap-2">
+                      {profile.resume_data.skills.map((skill, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="flex space-x-2 pt-4 border-t">
+                <label className="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 cursor-pointer">
+                  {uploadingResume ? 'Uploading...' : profile.resume_path ? 'Update Resume' : 'Upload Resume'}
+                  <input
+                    type="file"
+                    accept=".pdf,.docx,.doc"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        handleResumeUpload(file);
+                      }
+                    }}
+                    disabled={uploadingResume}
+                  />
+                </label>
+                <button
+                  onClick={handleDelete}
+                  className="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                >
+                  Delete Profile
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {!showForm && !profile && (
+          <div className="text-center text-gray-500 py-8">
+            <p className="mb-4">No profile found. Create your profile to get started!</p>
+            <button
+              onClick={() => setShowForm(true)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Create Profile
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

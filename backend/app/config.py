@@ -1,12 +1,8 @@
-"""
-Configuration settings for the application
-"""
 from pydantic_settings import BaseSettings
 from typing import Optional
 
 
 class Settings(BaseSettings):
-    """Application settings"""
     
     openai_api_key: str
     host: str = "0.0.0.0"
@@ -14,6 +10,8 @@ class Settings(BaseSettings):
     debug: bool = True
     playwright_headless: bool = True
     playwright_timeout: int = 30000
+    
+    secret_key: str = "your-secret-key-change-in-production"
     
     class Config:
         env_file = ".env"

@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
-import { analyzeForm, healthCheck } from './api/client';
+import { analyzeForm, healthCheck, isAuthenticated, getCurrentUser, logout } from './api/client';
 import ScreenshotUpload from './components/ScreenshotUpload';
 import FormPreview from './components/FormPreview';
 import FormFiller from './components/FormFiller';
 import ProfileManager from './components/ProfileManager';
+import Login from './components/Login';
 
 function App() {
+  const [authenticated, setAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
   const [step, setStep] = useState('upload');
   const [formData, setFormData] = useState(null);
   const [url, setUrl] = useState('');
@@ -14,8 +17,26 @@ function App() {
   const [apiStatus, setApiStatus] = useState('checking');
 
   useEffect(() => {
+    checkAuth();
     checkApiHealth();
   }, []);
+
+  const checkAuth = async () => {
+    if (isAuthenticated()) {
+      try {
+        const userData = await getCurrentUser();
+        setUser(userData);
+        setAuthenticated(true);
+      } catch (err) {
+        logout();
+      }
+    }
+  };
+
+  const handleLogin = () => {
+    setAuthenticated(true);
+    checkAuth();
+  };
 
   const checkApiHealth = async () => {
     try {
@@ -55,6 +76,10 @@ function App() {
     }
   };
 
+  if (!authenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       <nav className="bg-white shadow-sm">
@@ -79,6 +104,11 @@ function App() {
                   ? 'Disconnected'
                   : 'Checking...'}
               </span>
+              {user && (
+                <span className="text-sm text-gray-600">
+                  {user.email}
+                </span>
+              )}
             </div>
             <div className="flex space-x-4">
               <button
@@ -99,7 +129,13 @@ function App() {
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                Profiles
+                My Profile
+              </button>
+              <button
+                onClick={logout}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition"
+              >
+                Logout
               </button>
             </div>
           </div>
@@ -161,9 +197,9 @@ function App() {
         )}
 
         {step === 'profiles' && (
-          <div>
-            <ProfileManager />
-          </div>
+      <div>
+            <ProfileManager onSelectProfile={() => {}} />
+      </div>
         )}
       </main>
 
@@ -171,8 +207,8 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <p className="text-center text-gray-600 text-sm">
             AI Form Filling Assistant - Powered by GPT-4o Vision & Playwright
-          </p>
-        </div>
+        </p>
+      </div>
       </footer>
     </div>
   );
