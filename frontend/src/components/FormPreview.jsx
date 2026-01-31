@@ -1,11 +1,20 @@
 export default function FormPreview({ formData, onEdit }) {
-  if (!formData || !formData.fields) {
+  // Handle nested form_structure
+  const fields = formData?.fields || (formData?.form_structure && formData.form_structure.fields) || [];
+  
+  if (!formData || fields.length === 0) {
     return (
       <div className="text-center text-gray-500 py-8">
         No form data to preview
       </div>
     );
   }
+  
+  // Use the fields directly
+  const displayData = {
+    fields: fields,
+    actions: formData.actions || (formData.form_structure && formData.form_structure.actions) || []
+  };
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -25,7 +34,7 @@ export default function FormPreview({ formData, onEdit }) {
         </div>
 
         <div className="space-y-4">
-          {formData.fields.map((field, index) => (
+          {displayData.fields.map((field, index) => (
             <div
               key={index}
               className="border border-gray-200 rounded-lg p-4 hover:border-blue-500 transition"
@@ -69,13 +78,13 @@ export default function FormPreview({ formData, onEdit }) {
           ))}
         </div>
 
-        {formData.actions && formData.actions.length > 0 && (
+        {displayData.actions && displayData.actions.length > 0 && (
           <div className="mt-6 pt-6 border-t border-gray-200">
             <h3 className="text-lg font-semibold text-gray-800 mb-3">
               Automation Actions
             </h3>
             <div className="space-y-2">
-              {formData.actions.map((action, index) => (
+              {displayData.actions.map((action, index) => (
                 <div
                   key={index}
                   className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg"
