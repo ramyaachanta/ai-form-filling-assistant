@@ -145,7 +145,8 @@ class MultiStepService:
         self,
         page: Page,
         form_data: Dict[str, Any],
-        max_steps: int = 10
+        max_steps: int = 10,
+        resume_path: str = None
     ) -> Dict[str, Any]:
         executed_actions = []
         errors = []
@@ -159,6 +160,14 @@ class MultiStepService:
                     "success": False,
                     "error": "Not a multi-step form"
                 }
+            
+            # Try to upload resume if available (usually in first step)
+            if resume_path:
+                from app.services.automation_service import AutomationService
+                automation = AutomationService()
+                resume_uploaded = await automation._upload_resume_if_present(page, resume_path)
+                if resume_uploaded:
+                    executed_actions.append("Step 1: Uploaded resume file")
             
             if isinstance(list(form_data.values())[0] if form_data else None, dict):
                 step_data = form_data

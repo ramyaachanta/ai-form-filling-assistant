@@ -1,9 +1,7 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Form
 from fastapi.responses import JSONResponse
 from typing import Optional
 from pydantic import BaseModel
-from app.services.vision_service import VisionService
-from app.services.ocr_service import OCRService
 from app.services.automation_service import AutomationService
 from app.services.html_parser_service import HTMLParserService
 from app.services.safety_service import SafetyService
@@ -13,8 +11,8 @@ from app.utils.field_validator import FieldValidator
 from app.utils.field_matcher import FieldMatcher
 from app.database import get_db
 from app.api.auth_routes import get_current_user
+from app.utils.logger import logger
 from sqlalchemy.ext.asyncio import AsyncSession
-import io
 
 router = APIRouter()
 
@@ -22,7 +20,6 @@ router = APIRouter()
 class FillFormRequest(BaseModel):
     url: Optional[str] = None
     form_data: Optional[dict] = None
-    screenshot_path: Optional[str] = None
     skip_validation: bool = False
     multi_step: bool = False
 
@@ -38,37 +35,20 @@ async def health_check():
 
 @router.post("/analyze")
 async def analyze_form(
-    file: Optional[UploadFile] = File(None),
-    url: Optional[str] = None
+    url: Optional[str] = Form(None)
 ):
     try:
-        if url and not file:
-            html_parser = HTMLParserService()
-            try:
-                result = await html_parser.analyze_form_from_url(url)
-                await html_parser.close()
-                return JSONResponse(content=result)
-            except Exception as e:
-                await html_parser.close()
-                raise HTTPException(status_code=500, detail=f"HTML parsing failed: {str(e)}")
+        if not url:
+            raise HTTPException(status_code=400, detail="URL is required")
         
-        if file:
-            image_bytes = await file.read()
-            image = io.BytesIO(image_bytes)
-            
-            vision_service = VisionService()
-            try:
-                form_structure = await vision_service.analyze_form(image_bytes)
-                return JSONResponse(content=form_structure)
-            except Exception as e:
-                print(f"Vision API failed: {e}, falling back to OCR")
-                ocr_service = OCRService()
-                ocr_result = await ocr_service.analyze_form(image_bytes)
-                if isinstance(ocr_result, dict) and "form_structure" in ocr_result:
-                    return JSONResponse(content=ocr_result["form_structure"])
-                return JSONResponse(content=ocr_result)
-        
-        raise HTTPException(status_code=400, detail="Either URL or file must be provided")
+        html_parser = HTMLParserService()
+        try:
+            result = await html_parser.analyze_form_from_url(url)
+            await html_parser.close()
+            return JSONResponse(content=result)
+        except Exception as e:
+            await html_parser.close()
+            raise HTTPException(status_code=500, detail=f"HTML parsing failed: {str(e)}")
             
     except HTTPException:
         raise
@@ -92,6 +72,55 @@ async def preview_form(request: FillFormRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating preview: {str(e)}")
+
+
+@router.post("/check-fillable")
+async def check_if_fillable(
+    url: str = Form(...),
+    current_user = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Check if a form can be filled automatically"""
+    try:
+        from app.services.html_parser_service import HTMLParserService
+        from app.services.automation_service import AutomationService
+        
+        html_parser = HTMLParserService()
+        try:
+            analysis = await html_parser.analyze_form_from_url(url)
+            form_structure = analysis.get('form_structure', {})
+            fields = form_structure.get('fields', [])
+            
+            fillable = len(fields) > 0
+            
+            # Get profile data to see how many fields we can match
+            profile = await ProfileService.get_profile_by_user_id(db, current_user.id)
+            matchable_count = 0
+            if profile:
+                profile_data = ProfileService.profile_to_form_data(profile)
+                from app.utils.field_matcher import FieldMatcher
+                matcher = FieldMatcher()
+                matched = matcher.match_form_data_to_fields(profile_data, fields)
+                matchable_count = len(matched)
+            
+            await html_parser.close()
+            
+            return JSONResponse(content={
+                "fillable": fillable,
+                "total_fields": len(fields),
+                "matchable_fields": matchable_count,
+                "confidence": "high" if matchable_count >= len(fields) * 0.7 else "medium" if matchable_count > 0 else "low",
+                "message": f"Form has {len(fields)} fields. Can match {matchable_count} fields from your profile." if fillable else "Form may not be fillable automatically."
+            })
+        except Exception as e:
+            await html_parser.close()
+            return JSONResponse(content={
+                "fillable": False,
+                "error": str(e),
+                "message": "Could not analyze form"
+            })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking form: {str(e)}")
 
 
 @router.post("/dry-run")
@@ -123,18 +152,30 @@ async def fill_form(
             raise HTTPException(status_code=400, detail="URL is required for form filling")
         
         form_data = request.form_data.copy() if request.form_data else {}
+        resume_path = None
         
-        if not form_data:
-            profile = await ProfileService.get_profile_by_user_id(db, current_user.id)
-            if profile:
+        # Get profile to extract form data and resume path
+        profile = await ProfileService.get_profile_by_user_id(db, current_user.id)
+        if profile:
+            if not form_data:
                 profile_data = ProfileService.profile_to_form_data(profile)
                 form_data.update(profile_data)
-            else:
-                raise HTTPException(status_code=400, detail="No profile found. Please create your profile first.")
+            # Get resume path if available
+            if profile.resume_path:
+                from pathlib import Path
+                resume_file = Path(profile.resume_path)
+                if resume_file.exists():
+                    resume_path = str(resume_file.absolute())
+        elif not form_data:
+            raise HTTPException(status_code=400, detail="No profile found. Please create your profile first.")
         
         if not form_data:
-            raise HTTPException(status_code=400, detail="Form data is required")
+            raise HTTPException(
+                status_code=400, 
+                detail="Form data is required. Either provide form_data in request or ensure your profile has data."
+            )
         
+        # Skip strict validation - we'll fill as much as possible
         if not request.skip_validation:
             html_parser = HTMLParserService()
             try:
@@ -143,61 +184,160 @@ async def fill_form(
                 fields = form_structure.get('fields', [])
                 
                 if fields:
-                    validator = FieldValidator()
                     matcher = FieldMatcher()
-                    
+                    # Match and update form_data, but don't fail on validation errors
                     matched_data = matcher.match_form_data_to_fields(form_data, fields)
-                    is_valid, errors = validator.validate_form_data(matched_data, form_structure)
-                    
-                    if not is_valid:
-                        await html_parser.close()
-                        return JSONResponse(
-                            status_code=400,
-                            content={
-                                "success": False,
-                                "validation_errors": errors,
-                                "message": "Form data validation failed"
-                            }
-                        )
-                    
                     form_data = matched_data
-                else:
-                    print("No fields found in HTML, skipping validation")
+                    print(f"Matched {len(matched_data)} fields out of {len(fields)} available fields")
                 
                 await html_parser.close()
             except Exception as e:
                 await html_parser.close()
-                print(f"Validation warning: {e}")
+                print(f"Validation warning: {e} - continuing with available data")
         
-        automation_service = AutomationService()
+        # For form filling, always use non-headless mode so user can see and complete
+        from playwright.async_api import async_playwright
+        playwright = await async_playwright().start()
+        browser = None
+        page = None
         
         try:
-            if request.multi_step:
-                browser = await automation_service._get_browser()
-                page = await browser.new_page()
-                try:
-                    await page.goto(request.url, wait_until="domcontentloaded", timeout=automation_service.timeout)
-                    await page.wait_for_load_state("networkidle", timeout=10000)
-                    
-                    multi_step_service = MultiStepService()
-                    result = await multi_step_service.fill_multi_step_form(page, form_data)
-                    result["url"] = request.url
-                    result["profile_used"] = True
-                finally:
-                    await page.close()
-            else:
-                result = await automation_service.fill_form(
-                    url=request.url,
-                    form_data=form_data
+            # Launch browser in non-headless mode for user interaction - prefer Chrome
+            try:
+                browser = await playwright.chromium.launch(
+                    headless=False,
+                    channel="chrome",  # Use system Chrome if available
+                    args=[
+                        '--disable-blink-features=AutomationControlled',
+                        '--start-maximized',
+                        '--disable-web-security',
+                        '--disable-features=IsolateOrigins,site-per-process'
+                    ]
                 )
+            except Exception:
+                try:
+                    # Try chromium if chrome channel not available
+                    browser = await playwright.chromium.launch(
+                        headless=False,
+                        args=[
+                            '--disable-blink-features=AutomationControlled',
+                            '--start-maximized'
+                        ]
+                    )
+                except Exception:
+                    # Fallback to firefox
+                    browser = await playwright.firefox.launch(headless=False)
+            
+            page = await browser.new_page()
+            # Set larger viewport to see more content
+            await page.set_viewport_size({"width": 1920, "height": 1080})
+            
+            await page.goto(request.url, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_load_state("networkidle", timeout=15000)
+            await page.wait_for_timeout(3000)  # Wait for dynamic content
+            
+            # Scroll through page to ensure all content is loaded - scroll all the way to bottom
+            try:
+                # First, scroll to very bottom to trigger any lazy-loaded content
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(2000)
+                
+                # Now scroll back up in increments to load everything
+                viewport_height = await page.evaluate("window.innerHeight")
+                total_height = await page.evaluate("document.body.scrollHeight")
+                current_position = 0
+                scroll_step = viewport_height * 0.7
+                
+                while current_position < total_height:
+                    await page.evaluate(f"window.scrollTo({{ top: {current_position}, behavior: 'smooth' }})")
+                    await page.wait_for_timeout(1000)  # Longer wait for content
+                    current_position += scroll_step
+                    # Re-check total height in case it increased
+                    new_height = await page.evaluate("document.body.scrollHeight")
+                    if new_height > total_height:
+                        total_height = new_height
+                        # Scroll to new bottom
+                        await page.evaluate(f"window.scrollTo({{ top: {new_height}, behavior: 'smooth' }})")
+                        await page.wait_for_timeout(1000)
+                
+                # Scroll back to top
+                await page.evaluate("window.scrollTo({ top: 0, behavior: 'smooth' })")
+                await page.wait_for_timeout(1500)
+            except Exception as e:
+                logger.warning(f"Scrolling issue: {e}")
+                pass
+            
+            # Try to detect if it's a multi-step form
+            multi_step_service = MultiStepService()
+            is_multi_step = await multi_step_service.detect_multi_step_form(page)
+            
+            automation_service = AutomationService()
+            
+            if is_multi_step and request.multi_step:
+                # Use multi-step service
+                result = await multi_step_service.fill_multi_step_form(page, form_data, resume_path=resume_path)
+                result["url"] = request.url
+                result["profile_used"] = not request.form_data
+                result["form_type"] = "multi-step"
+            else:
+                # Use regular form filling - fill as much as possible
+                result = await automation_service.fill_form_with_page(page, form_data, resume_path=resume_path)
+                result["url"] = request.url
+                result["profile_used"] = not request.form_data
+                result["form_type"] = "single-page"
+                result["fillable"] = result.get("filled_count", 0) > 0
+            
+            # Save application to database
+            try:
+                from app.services.application_service import ApplicationService
+                from app.models.application import ApplicationCreate
+                
+                # Extract job title and company from URL if possible
+                job_title = None
+                company_name = None
+                if "greenhouse.io" in request.url:
+                    parts = request.url.split("/")
+                    if len(parts) > 2:
+                        company_name = parts[-2] if parts[-2] != "jobs" else None
+                
+                application_data = ApplicationCreate(
+                    job_url=request.url,
+                    job_title=job_title,
+                    company_name=company_name,
+                    form_data=form_data,
+                    filled_fields={
+                        "filled_count": result.get("filled_count", 0),
+                        "total_fields": len(form_data),
+                        "actions": result.get("executed_actions", [])
+                    }
+                )
+                application = await ApplicationService.create_application(
+                    db, current_user.id, application_data
+                )
+                result["application_id"] = application.id
+            except Exception as e:
+                logger.warning(f"Could not save application: {e}")
+            
+            # Don't close browser - keep it open for user to complete and submit
+            # Browser will stay open until user closes it manually
+            result["browser_open"] = True
+            result["message"] = f"Browser opened with form. {result.get('message', '')} Please complete remaining fields and submit manually."
             
             return JSONResponse(content=result)
-        finally:
-            # Cleanup browser if needed
-            try:
-                await automation_service.close()
-            except Exception:
-                pass
+        except Exception as e:
+            # Close browser on error
+            if page:
+                try:
+                    await page.close()
+                except:
+                    pass
+            if browser:
+                try:
+                    await browser.close()
+                except:
+                    pass
+            raise
+        # Note: Browser stays open - user will close it manually after submitting
         
     except HTTPException:
         raise
