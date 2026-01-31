@@ -25,6 +25,10 @@ async def migrate_database():
             print("Adding resume_data column...")
             cursor.execute("ALTER TABLE profiles ADD COLUMN resume_data JSON")
         
+        if 'quick_apply_data' not in columns:
+            print("Adding quick_apply_data column...")
+            cursor.execute("ALTER TABLE profiles ADD COLUMN quick_apply_data JSON")
+        
         conn.commit()
         print("✅ Database migration completed successfully!")
         

@@ -56,6 +56,9 @@ async def init_db():
             if 'resume_data' not in columns:
                 cursor.execute("ALTER TABLE profiles ADD COLUMN resume_data JSON")
             
+            if 'quick_apply_data' not in columns:
+                cursor.execute("ALTER TABLE profiles ADD COLUMN quick_apply_data JSON")
+            
             # Check if applications table exists
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='applications'")
             if not cursor.fetchone():

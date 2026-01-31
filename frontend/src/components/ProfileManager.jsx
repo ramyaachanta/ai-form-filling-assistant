@@ -3,15 +3,12 @@ import {
   getMyProfile,
   createProfile,
   updateProfile,
-  deleteProfile,
-  uploadResume,
 } from '../api/client';
 
 export default function ProfileManager({ onSelectProfile, selectedProfileId }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [uploadingResume, setUploadingResume] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -99,40 +96,7 @@ export default function ProfileManager({ onSelectProfile, selectedProfileId }) {
     }
   };
 
-  const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete your profile? This cannot be undone.')) {
-      try {
-        await deleteProfile();
-        setProfile(null);
-        setShowForm(true);
-      } catch (error) {
-        console.error('Error deleting profile:', error);
-        alert('Error deleting profile');
-      }
-    }
-  };
 
-  const handleResumeUpload = async (file) => {
-    if (!file) return;
-    
-    const fileExt = file.name.split('.').pop().toLowerCase();
-    if (!['pdf', 'docx', 'doc'].includes(fileExt)) {
-      alert('Please upload a PDF or DOCX file');
-      return;
-    }
-    
-    try {
-      setUploadingResume(true);
-      const result = await uploadResume(file);
-      alert('Resume uploaded and parsed successfully!');
-      await loadProfile();
-    } catch (error) {
-      console.error('Error uploading resume:', error);
-      alert('Error uploading resume: ' + (error.response?.data?.detail || error.message));
-    } finally {
-      setUploadingResume(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -151,7 +115,7 @@ export default function ProfileManager({ onSelectProfile, selectedProfileId }) {
             <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
               My Profile
             </h2>
-            <p className="text-gray-600 mt-1">Manage your personal information and resume</p>
+            <p className="text-gray-600 mt-1">Manage your personal information</p>
           </div>
           {profile && (
             <button
@@ -303,44 +267,6 @@ export default function ProfileManager({ onSelectProfile, selectedProfileId }) {
                     </div>
                   </div>
                 )}
-              </div>
-              <div className="flex space-x-3 pt-6 border-t-2 border-gray-200">
-                <label className="px-6 py-3 text-sm font-semibold bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 cursor-pointer transition-all duration-200 transform hover:scale-105 shadow-lg shadow-green-500/30 flex items-center space-x-2">
-                  {uploadingResume ? (
-                    <>
-                      <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span>Uploading...</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                      <span>{profile.resume_path ? 'Update Resume' : 'Upload Resume'}</span>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept=".pdf,.docx,.doc"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files[0];
-                      if (file) {
-                        handleResumeUpload(file);
-                      }
-                    }}
-                    disabled={uploadingResume}
-                  />
-                </label>
-                <button
-                  onClick={handleDelete}
-                  className="px-6 py-3 text-sm font-semibold bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-xl hover:from-red-600 hover:to-rose-700 transition-all duration-200 transform hover:scale-105 shadow-lg shadow-red-500/30"
-                >
-                  Delete Profile
-                </button>
               </div>
             </div>
           </div>
