@@ -3,6 +3,7 @@ import { analyzeForm, healthCheck, isAuthenticated, getCurrentUser, logout, chec
 import FormPreview from './components/FormPreview';
 import FormFiller from './components/FormFiller';
 import ProfileManager from './components/ProfileManager';
+import QuickApplyProfile from './components/QuickApplyProfile';
 import ApplicationsDashboard from './components/ApplicationsDashboard';
 import Login from './components/Login';
 
@@ -16,6 +17,7 @@ function App() {
   const [error, setError] = useState(null);
   const [apiStatus, setApiStatus] = useState('checking');
   const [fillableInfo, setFillableInfo] = useState(null);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -78,6 +80,18 @@ function App() {
     }
   };
 
+  // Close account menu when clicking outside
+  useEffect(() => {
+    if (!authenticated) return;
+    const handleClickOutside = (event) => {
+      if (showAccountMenu && !event.target.closest('.account-menu-container')) {
+        setShowAccountMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAccountMenu, authenticated]);
+
   if (!authenticated) {
     return <Login onLogin={handleLogin} />;
   }
@@ -88,66 +102,19 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setStep('upload')}
+                className="flex items-center space-x-3 hover:opacity-80 transition-opacity"
+              >
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg">
                   <span className="text-white font-bold text-xl">AI</span>
                 </div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                   Form Filling Assistant
                 </h1>
-              </div>
-              <span
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center space-x-1.5 shadow-sm ${
-                  apiStatus === 'connected'
-                    ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                    : apiStatus === 'disconnected'
-                    ? 'bg-red-100 text-red-700 border border-red-200'
-                    : 'bg-amber-100 text-amber-700 border border-amber-200'
-                }`}
-              >
-                <span className={`w-2 h-2 rounded-full ${
-                  apiStatus === 'connected' ? 'bg-emerald-500' : apiStatus === 'disconnected' ? 'bg-red-500' : 'bg-amber-500'
-                } animate-pulse`}></span>
-                <span>
-                  {apiStatus === 'connected'
-                    ? 'Connected'
-                    : apiStatus === 'disconnected'
-                    ? 'Disconnected'
-                    : 'Checking...'}
-                </span>
-              </span>
-              {user && (
-                <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 bg-gray-100 rounded-full">
-                  <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-                    {user.email.charAt(0).toUpperCase()}
-                  </div>
-                  <span className="text-sm text-gray-700 font-medium">
-                    {user.email}
-                  </span>
-                </div>
-              )}
+              </button>
             </div>
-            <div className="flex space-x-3">
-              <button
-                onClick={() => setStep('upload')}
-                className={`px-5 py-2.5 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 ${
-                  step === 'upload'
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/50'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 shadow-sm'
-                }`}
-              >
-                Analyze
-              </button>
-              <button
-                onClick={() => setStep('profiles')}
-                className={`px-5 py-2.5 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 ${
-                  step === 'profiles'
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/50'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 shadow-sm'
-                }`}
-              >
-                My Profile
-              </button>
+            <div className="flex items-center space-x-3">
               <button
                 onClick={() => setStep('applications')}
                 className={`px-5 py-2.5 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 ${
@@ -158,12 +125,59 @@ function App() {
               >
                 Applications
               </button>
-              <button
-                onClick={logout}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 text-white font-medium hover:from-red-600 hover:to-rose-700 transition-all duration-200 transform hover:scale-105 shadow-lg shadow-red-500/30"
-              >
-                Logout
-              </button>
+              {user && (
+                <div className="relative account-menu-container">
+                  <button
+                    onClick={() => setShowAccountMenu(!showAccountMenu)}
+                    className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-full hover:opacity-80 transition-all duration-200 shadow-lg"
+                  >
+                    <span className="text-white text-lg font-bold">
+                      {user.email.charAt(0).toUpperCase()}
+                    </span>
+                  </button>
+                  
+                  {showAccountMenu && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border-2 border-gray-200 py-2 z-50">
+                      <button
+                        onClick={() => {
+                          setStep('profiles');
+                          setShowAccountMenu(false);
+                        }}
+                        className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors ${
+                          step === 'profiles'
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        My Profile
+                      </button>
+                      <button
+                        onClick={() => {
+                          setStep('quickapply');
+                          setShowAccountMenu(false);
+                        }}
+                        className={`w-full text-left px-4 py-3 text-sm font-medium transition-colors ${
+                          step === 'quickapply'
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        Quick Apply
+                      </button>
+                      <div className="border-t border-gray-200 my-1"></div>
+                      <button
+                        onClick={() => {
+                          logout();
+                          setShowAccountMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -360,6 +374,12 @@ function App() {
         {step === 'profiles' && (
           <div>
             <ProfileManager onSelectProfile={() => {}} />
+          </div>
+        )}
+
+        {step === 'quickapply' && (
+          <div>
+            <QuickApplyProfile />
           </div>
         )}
 
