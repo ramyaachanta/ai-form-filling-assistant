@@ -349,6 +349,50 @@ npm run dev -- --port 3000
    VITE_API_URL=https://api.yourdomain.com
    ```
 
+## 🐳 Docker Deployment
+
+### Using Docker Compose
+
+The easiest way to run the entire stack:
+
+1. **Create environment file:**
+   ```bash
+   # Create .env file in root directory
+   echo "OPENAI_API_KEY=your_key_here" > .env
+   echo "SECRET_KEY=$(openssl rand -hex 32)" >> .env
+   ```
+
+2. **Start services:**
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **View logs:**
+   ```bash
+   docker-compose logs -f
+   ```
+
+4. **Stop services:**
+   ```bash
+   docker-compose down
+   ```
+
+### Individual Docker Builds
+
+**Backend:**
+```bash
+cd backend
+docker build -t ai-form-backend .
+docker run -p 8000:8000 --env-file .env ai-form-backend
+```
+
+**Frontend:**
+```bash
+cd frontend
+docker build -t ai-form-frontend .
+docker run -p 80:80 ai-form-frontend
+```
+
 ## 🧪 Testing
 
 ### Backend Tests
@@ -364,6 +408,12 @@ Run with coverage:
 
 ```bash
 pytest tests/ --cov=app --cov-report=html
+```
+
+Run specific test file:
+
+```bash
+pytest tests/test_field_validator.py
 ```
 
 ### Frontend Tests

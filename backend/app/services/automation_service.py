@@ -106,11 +106,33 @@ class AutomationService:
             
             await page.wait_for_timeout(1000)
             
+            # Try to detect form submission
+            try:
+                submit_buttons = await page.query_selector_all(
+                    "button[type='submit'], input[type='submit'], button:has-text('Submit'), button:has-text('Send')"
+                )
+                if submit_buttons:
+                    # Check if form was submitted by looking for success indicators
+                    await page.wait_for_timeout(2000)
+                    current_url = page.url
+                    page_content = await page.content()
+                    
+                    # Simple heuristics for submission detection
+                    success_indicators = [
+                        "thank you", "success", "submitted", "received",
+                        "confirmation", "complete"
+                    ]
+                    if any(indicator in page_content.lower() for indicator in success_indicators):
+                        submitted = True
+            except Exception:
+                pass
+            
             return {
                 "success": len(errors) == 0,
                 "url": url,
                 "executed_actions": executed_actions,
                 "errors": errors,
+                "submitted": submitted,
                 "message": "Form filled successfully" if len(errors) == 0 else f"Completed with {len(errors)} errors"
             }
             
