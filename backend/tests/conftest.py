@@ -8,6 +8,9 @@ os.environ.setdefault("OPENAI_API_KEY", "test-key-for-ci")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci")
 
 from app.database import Base
+# Import models to ensure tables are created
+from app.models.user import User
+from app.models.profile import Profile
 
 
 @pytest.fixture(scope="session")
