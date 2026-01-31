@@ -20,6 +20,8 @@ class SafetyService:
                 form_structure = result.get('form_structure', {})
             except Exception:
                 form_structure = {"fields": [], "actions": []}
+            finally:
+                await html_parser.close()
         
         fields = form_structure.get('fields', [])
         
@@ -89,4 +91,6 @@ class SafetyService:
                 "dry_run": True,
                 "error": str(e)
             }
+        finally:
+            await html_parser.close()
 

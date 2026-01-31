@@ -127,6 +127,10 @@ class AutomationService:
     
     async def close(self):
         if self.browser:
-            await self.browser.close()
-            self.browser = None
+            try:
+                await self.browser.close()
+            except Exception:
+                pass
+            finally:
+                self.browser = None
 

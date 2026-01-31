@@ -20,7 +20,8 @@ class FieldValidator:
     def validate_phone(phone: str) -> Tuple[bool, str]:
         if not phone:
             return True, ""
-        cleaned = re.sub(r'[\s\-\(\)]', '', phone)
+        # Remove spaces, dashes, parentheses, and plus signs
+        cleaned = re.sub(r'[\s\-\(\)\+]', '', phone)
         if not cleaned.isdigit() or len(cleaned) < 10:
             return False, "Invalid phone number format"
         return True, ""

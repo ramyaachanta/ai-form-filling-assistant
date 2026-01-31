@@ -171,26 +171,33 @@ async def fill_form(
         
         automation_service = AutomationService()
         
-        if request.multi_step:
-            browser = await automation_service._get_browser()
-            page = await browser.new_page()
+        try:
+            if request.multi_step:
+                browser = await automation_service._get_browser()
+                page = await browser.new_page()
+                try:
+                    await page.goto(request.url, wait_until="domcontentloaded", timeout=automation_service.timeout)
+                    await page.wait_for_load_state("networkidle", timeout=10000)
+                    
+                    multi_step_service = MultiStepService()
+                    result = await multi_step_service.fill_multi_step_form(page, form_data)
+                    result["url"] = request.url
+                    result["profile_used"] = True
+                finally:
+                    await page.close()
+            else:
+                result = await automation_service.fill_form(
+                    url=request.url,
+                    form_data=form_data
+                )
+            
+            return JSONResponse(content=result)
+        finally:
+            # Cleanup browser if needed
             try:
-                await page.goto(request.url, wait_until="domcontentloaded", timeout=automation_service.timeout)
-                await page.wait_for_load_state("networkidle", timeout=10000)
-                
-                multi_step_service = MultiStepService()
-                result = await multi_step_service.fill_multi_step_form(page, form_data)
-                result["url"] = request.url
-                result["profile_used"] = True
-            finally:
-                await page.close()
-        else:
-            result = await automation_service.fill_form(
-                url=request.url,
-                form_data=form_data
-            )
-        
-        return JSONResponse(content=result)
+                await automation_service.close()
+            except Exception:
+                pass
         
     except HTTPException:
         raise
