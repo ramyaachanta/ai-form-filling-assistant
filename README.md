@@ -351,31 +351,42 @@ npm run dev -- --port 3000
 
 ## 🐳 Docker Deployment
 
-### Using Docker Compose
+### Quick Deploy
 
-The easiest way to run the entire stack:
+**Using the deployment script (recommended):**
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
 
-1. **Create environment file:**
-   ```bash
-   # Create .env file in root directory
-   echo "OPENAI_API_KEY=your_key_here" > .env
-   echo "SECRET_KEY=$(openssl rand -hex 32)" >> .env
-   ```
+**Manual deployment:**
+```bash
+# 1. Create .env file in root directory
+cat > .env << EOF
+OPENAI_API_KEY=your_openai_api_key_here
+SECRET_KEY=$(openssl rand -hex 32)
+DEBUG=False
+EOF
 
-2. **Start services:**
-   ```bash
-   docker-compose up -d
-   ```
+# 2. Start services
+docker-compose up -d
 
-3. **View logs:**
-   ```bash
-   docker-compose logs -f
-   ```
+# 3. View logs
+docker-compose logs -f
 
-4. **Stop services:**
-   ```bash
-   docker-compose down
-   ```
+# 4. Stop services
+docker-compose down
+```
+
+### Services
+
+After deployment, services are available at:
+- **Frontend:** http://localhost
+- **Backend API:** http://localhost:8000
+- **API Docs:** http://localhost:8000/docs
+- **Health Check:** http://localhost:8000/api/health
+
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)
 
 ### Individual Docker Builds
 

@@ -23,8 +23,12 @@ jobs:
         cd backend
         pip install -r requirements.txt
         pip install pytest pytest-asyncio pytest-cov
+        # Skip Playwright browser installation for CI (not needed for current tests)
     
     - name: Run tests
+      env:
+        OPENAI_API_KEY: test-key-for-ci
+        SECRET_KEY: test-secret-key-for-ci
       run: |
         cd backend
         pytest tests/ --cov=app --cov-report=xml

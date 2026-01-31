@@ -1,0 +1,37 @@
+version: '3.8'
+
+# Production override for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  backend:
+    # Remove development volume mounts
+    volumes:
+      - ./backend/profiles.db:/app/profiles.db
+      - ./backend/logs:/app/logs
+    # Production environment
+    environment:
+      - DEBUG=False
+      - PLAYWRIGHT_HEADLESS=True
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    restart: always
+
+  frontend:
+    # Production settings
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M

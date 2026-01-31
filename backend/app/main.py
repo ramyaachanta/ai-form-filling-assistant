@@ -8,6 +8,7 @@ from app.utils.logger import logger
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.config import settings
 import asyncio
+import os
 
 app = FastAPI(
     title="AI Form Filling Assistant",
@@ -18,9 +19,10 @@ app = FastAPI(
 logger.info("Starting AI Form Filling Assistant API")
 
 # CORS middleware
+cors_origins = ["*"] if settings.debug else os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.debug else ["http://localhost:5173", "https://yourdomain.com"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

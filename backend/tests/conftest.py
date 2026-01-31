@@ -1,6 +1,12 @@
 import pytest
 import asyncio
+import os
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+
+# Set test environment variables before importing app modules
+os.environ.setdefault("OPENAI_API_KEY", "test-key-for-ci")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ci")
+
 from app.database import Base
 
 
