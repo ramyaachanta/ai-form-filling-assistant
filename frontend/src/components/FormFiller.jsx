@@ -23,14 +23,18 @@ export default function FormFiller({ formData, url }) {
   };
 
   useEffect(() => {
-    if (formData && formData.fields) {
-      const initialData = {};
-      formData.fields.forEach((field) => {
-        if (field.label) {
-          initialData[field.label] = field.value || '';
-        }
-      });
-      setCustomData(initialData);
+    if (formData) {
+      // Handle both direct form_structure and nested form_structure
+      const fields = formData.fields || (formData.form_structure && formData.form_structure.fields) || [];
+      if (fields.length > 0) {
+        const initialData = {};
+        fields.forEach((field) => {
+          if (field.label) {
+            initialData[field.label] = field.value || '';
+          }
+        });
+        setCustomData(initialData);
+      }
     }
   }, [formData]);
 
@@ -57,7 +61,12 @@ export default function FormFiller({ formData, url }) {
       const response = await fillForm(requestData);
       setResult(response);
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Error filling form');
+      const errorMessage = err.response?.data?.detail || 
+                          err.response?.data?.message || 
+                          err.message || 
+                          'Error filling form';
+      setError(errorMessage);
+      console.error('Fill form error:', err.response?.data || err);
     } finally {
       setLoading(false);
     }
@@ -122,7 +131,7 @@ export default function FormFiller({ formData, url }) {
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-4">Form Data</h3>
             <div className="space-y-3">
-              {formData?.fields?.map((field, index) => (
+              {(formData?.fields || (formData?.form_structure && formData.form_structure.fields) || []).map((field, index) => (
                 <div key={index}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {field.label}
@@ -195,11 +204,74 @@ export default function FormFiller({ formData, url }) {
         )}
 
         {result && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <h3 className="font-semibold text-green-800 mb-2">Success!</h3>
-            <pre className="text-sm text-green-700 whitespace-pre-wrap">
-              {JSON.stringify(result, null, 2)}
-            </pre>
+          <div className={`mt-4 p-4 border rounded-lg ${
+            result.success 
+              ? 'bg-green-50 border-green-200' 
+              : result.fillable || result.filled_count > 0 || result.browser_open
+              ? 'bg-yellow-50 border-yellow-200'
+              : 'bg-red-50 border-red-200'
+          }`}>
+            <h3 className={`font-semibold mb-2 ${
+              result.success 
+                ? 'text-green-800' 
+                : result.fillable || result.filled_count > 0 || result.browser_open
+                ? 'text-yellow-800'
+                : 'text-red-800'
+            }`}>
+              {result.browser_open
+                ? '🌐 Browser Opened - Complete Remaining Fields'
+                : result.success 
+                ? '✅ Form Filled Successfully!' 
+                : result.fillable || result.filled_count > 0
+                ? `⚠️ Partially Filled (${result.filled_count || 0} fields)`
+                : '❌ Could Not Fill Form'}
+            </h3>
+            {result.message && (
+              <p className={`text-sm mb-2 ${
+                result.success ? 'text-green-700' : result.browser_open ? 'text-blue-700' : 'text-yellow-700'
+              }`}>
+                {result.message}
+              </p>
+            )}
+            {result.browser_open && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                <p className="text-sm text-blue-800 font-medium">
+                  💡 The browser window is now open. Complete any remaining fields and submit the form manually.
+                  Once submitted, you can update the application status in the Applications dashboard.
+                </p>
+              </div>
+            )}
+            {result.executed_actions && result.executed_actions.length > 0 && (
+              <div className="mb-2">
+                <p className="text-sm font-medium mb-1">Actions performed:</p>
+                <ul className="text-sm list-disc list-inside space-y-1">
+                  {result.executed_actions.slice(0, 10).map((action, idx) => (
+                    <li key={idx} className="text-gray-700">{action}</li>
+                  ))}
+                  {result.executed_actions.length > 10 && (
+                    <li className="text-gray-500">... and {result.executed_actions.length - 10} more</li>
+                  )}
+                </ul>
+              </div>
+            )}
+            {result.errors && result.errors.length > 0 && (
+              <div className="mt-2">
+                <p className="text-sm font-medium text-red-700 mb-1">Issues encountered:</p>
+                <ul className="text-sm list-disc list-inside space-y-1">
+                  {result.errors.slice(0, 5).map((error, idx) => (
+                    <li key={idx} className="text-red-600">{error}</li>
+                  ))}
+                  {result.errors.length > 5 && (
+                    <li className="text-red-500">... and {result.errors.length - 5} more issues</li>
+                  )}
+                </ul>
+              </div>
+            )}
+            {result.fillable === false && (
+              <p className="text-sm text-red-700 mt-2">
+                This form may not be fillable automatically. Please fill it manually.
+              </p>
+            )}
           </div>
         )}
       </div>

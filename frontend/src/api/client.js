@@ -29,14 +29,9 @@ apiClient.interceptors.response.use(
   }
 );
 
-export const analyzeForm = async (file, url = null) => {
+export const analyzeForm = async (url) => {
   const formData = new FormData();
-  if (file) {
-    formData.append('file', file);
-  }
-  if (url) {
-    formData.append('url', url);
-  }
+  formData.append('url', url);
   
   const response = await axios.post(`${API_BASE_URL}/api/analyze`, formData, {
     headers: {
@@ -58,6 +53,24 @@ export const dryRunForm = async (requestData) => {
 
 export const fillForm = async (requestData) => {
   const response = await apiClient.post('/api/fill', requestData);
+  return response.data;
+};
+
+export const checkIfFillable = async (url) => {
+  const formData = new FormData();
+  formData.append('url', url);
+  
+  const token = localStorage.getItem('auth_token');
+  const response = await axios.post(
+    `${API_BASE_URL}/api/check-fillable`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${token}`,
+      },
+    }
+  );
   return response.data;
 };
 
@@ -150,6 +163,26 @@ export const logout = () => {
 
 export const isAuthenticated = () => {
   return !!localStorage.getItem('auth_token');
+};
+
+export const getMyApplications = async () => {
+  const response = await apiClient.get('/api/applications');
+  return response.data;
+};
+
+export const createApplication = async (applicationData) => {
+  const response = await apiClient.post('/api/applications', applicationData);
+  return response.data;
+};
+
+export const updateApplication = async (applicationId, applicationData) => {
+  const response = await apiClient.put(`/api/applications/${applicationId}`, applicationData);
+  return response.data;
+};
+
+export const deleteApplication = async (applicationId) => {
+  const response = await apiClient.delete(`/api/applications/${applicationId}`);
+  return response.data;
 };
 
 export default apiClient;
