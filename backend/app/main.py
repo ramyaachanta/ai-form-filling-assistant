@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 from app.api.profile_routes import router as profile_router
 from app.api.auth_routes import router as auth_router
+from app.api.application_routes import router as application_router
 from app.database import init_db
 from app.utils.logger import logger
 from app.middleware.rate_limit import RateLimitMiddleware
@@ -35,10 +36,15 @@ if not settings.debug:
 app.include_router(router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(profile_router, prefix="/api")
+app.include_router(application_router, prefix="/api")
 
 
 @app.on_event("startup")
 async def startup_event():
+    # Import all models to ensure they're registered with Base before creating tables
+    from app.models.user import User
+    from app.models.profile import Profile
+    from app.models.application import Application
     logger.info("Initializing database...")
     await init_db()
     logger.info("Database initialized successfully")

@@ -56,6 +56,12 @@ async def init_db():
             if 'resume_data' not in columns:
                 cursor.execute("ALTER TABLE profiles ADD COLUMN resume_data JSON")
             
+            # Check if applications table exists
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='applications'")
+            if not cursor.fetchone():
+                # Table will be created by SQLAlchemy on next run
+                pass
+            
             sync_conn.commit()
         except Exception as e:
             print(f"Migration warning: {e}")
