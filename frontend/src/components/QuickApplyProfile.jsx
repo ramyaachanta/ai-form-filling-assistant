@@ -84,8 +84,9 @@ export default function QuickApplyProfile() {
     
     try {
       setUploadingResume(true);
-      await uploadResume(file);
-      alert('Resume uploaded and parsed successfully!');
+      const response = await uploadResume(file);
+      alert('Resume uploaded and parsed successfully! Your Quick Apply profile has been auto-filled.');
+      // Reload profile to get updated quick_apply_data
       await loadProfile();
     } catch (error) {
       console.error('Error uploading resume:', error);
@@ -103,26 +104,77 @@ export default function QuickApplyProfile() {
 
     try {
       setSaving(true);
-      await updateProfile({
+      
+      // Prepare update data - ensure all fields are properly formatted
+      const updateData = {
         name: formData.first_name && formData.last_name 
           ? `${formData.first_name} ${formData.last_name}` 
-          : profile.name,
-        phone: formData.phone,
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        preferred_first_name: formData.preferred_first_name,
-        phone_country: formData.phone_country,
-        location: formData.location,
-        education: formData.education,
-        employment: formData.employment,
-        online_profiles: formData.online_profiles,
-        voluntary_identification: formData.voluntary_identification
-      });
+          : profile.name || '',
+        phone: formData.phone || '',
+        first_name: formData.first_name || '',
+        last_name: formData.last_name || '',
+        preferred_first_name: formData.preferred_first_name || '',
+        phone_country: formData.phone_country || 'United States+1',
+        location: formData.location || '',
+        education: formData.education || [],
+        employment: formData.employment || [],
+        online_profiles: formData.online_profiles || {
+          linkedin: '',
+          github: '',
+          portfolio: '',
+          website: ''
+        },
+        voluntary_identification: formData.voluntary_identification || {
+          gender: '',
+          hispanic_latino: '',
+          race: '',
+          veteran_status: '',
+          disability_status: ''
+        }
+      };
+      
+      console.log('Saving profile data:', JSON.stringify(updateData, null, 2));
+      console.log('Education array:', formData.education);
+      console.log('Employment array:', formData.employment);
+      
+      const response = await updateProfile(updateData);
+      console.log('Save response:', JSON.stringify(response, null, 2));
+      console.log('Response quick_apply_data:', response?.quick_apply_data);
+      
+      // Update profile state immediately from response
+      if (response) {
+        setProfile(response);
+        const quickApply = response.quick_apply_data || {};
+        setFormData({
+          first_name: quickApply.first_name || '',
+          last_name: quickApply.last_name || '',
+          preferred_first_name: quickApply.preferred_first_name || '',
+          phone: response.phone || quickApply.phone || '',
+          phone_country: quickApply.phone_country || 'United States+1',
+          location: quickApply.location || '',
+          education: quickApply.education || [],
+          employment: quickApply.employment || [],
+          online_profiles: quickApply.online_profiles || {
+            linkedin: '',
+            github: '',
+            portfolio: '',
+            website: ''
+          },
+          voluntary_identification: quickApply.voluntary_identification || {
+            gender: '',
+            hispanic_latino: '',
+            race: '',
+            veteran_status: '',
+            disability_status: ''
+          }
+        });
+      }
+      
       alert('Quick Apply profile saved successfully!');
-      await loadProfile();
     } catch (error) {
       console.error('Error saving profile:', error);
-      alert('Error saving profile: ' + (error.response?.data?.detail || error.message));
+      console.error('Error details:', error.response?.data);
+      alert('Error saving profile: ' + (error.response?.data?.detail || error.message || 'Unknown error'));
     } finally {
       setSaving(false);
     }
