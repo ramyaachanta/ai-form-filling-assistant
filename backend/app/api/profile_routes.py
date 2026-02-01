@@ -120,6 +120,7 @@ async def upload_resume(
         
         resume_data = await ResumeParserService.parse_resume(str(resume_path))
         
+        # Update basic profile fields
         update_data = ProfileUpdate()
         if resume_data.get("name") and not profile.name:
             update_data.name = resume_data["name"]
@@ -128,8 +129,69 @@ async def upload_resume(
         if resume_data.get("phone") and not profile.phone:
             update_data.phone = resume_data["phone"]
         
+        # Build quick_apply_data from parsed resume
+        quick_apply_data = profile.quick_apply_data or {}
+        
+        # Update personal information
+        if resume_data.get("first_name") and not quick_apply_data.get("first_name"):
+            quick_apply_data["first_name"] = resume_data["first_name"]
+        if resume_data.get("last_name") and not quick_apply_data.get("last_name"):
+            quick_apply_data["last_name"] = resume_data["last_name"]
+        if resume_data.get("phone") and not quick_apply_data.get("phone"):
+            quick_apply_data["phone"] = resume_data["phone"]
+        if resume_data.get("location") and not quick_apply_data.get("location"):
+            quick_apply_data["location"] = resume_data["location"]
+        
+        # Update structured education
+        if resume_data.get("structured_education") and not quick_apply_data.get("education"):
+            quick_apply_data["education"] = resume_data["structured_education"]
+        elif resume_data.get("structured_education") and quick_apply_data.get("education"):
+            # Merge with existing, avoiding duplicates
+            existing_edu = quick_apply_data.get("education", [])
+            new_edu = resume_data["structured_education"]
+            # Simple merge - add if school/degree combo doesn't exist
+            for edu in new_edu:
+                if not any(e.get("school") == edu.get("school") and e.get("degree") == edu.get("degree") 
+                          for e in existing_edu):
+                    existing_edu.append(edu)
+            quick_apply_data["education"] = existing_edu
+        
+        # Update structured employment
+        if resume_data.get("structured_employment") and not quick_apply_data.get("employment"):
+            quick_apply_data["employment"] = resume_data["structured_employment"]
+        elif resume_data.get("structured_employment") and quick_apply_data.get("employment"):
+            # Merge with existing, avoiding duplicates
+            existing_emp = quick_apply_data.get("employment", [])
+            new_emp = resume_data["structured_employment"]
+            # Simple merge - add if company/title combo doesn't exist
+            for emp in new_emp:
+                if not any(e.get("company") == emp.get("company") and e.get("title") == emp.get("title")
+                          for e in existing_emp):
+                    existing_emp.append(emp)
+            quick_apply_data["employment"] = existing_emp
+        
+        # Update online profiles
+        if resume_data.get("online_profiles"):
+            if not quick_apply_data.get("online_profiles"):
+                quick_apply_data["online_profiles"] = {}
+            online_profiles = quick_apply_data["online_profiles"]
+            for key, value in resume_data["online_profiles"].items():
+                if value and not online_profiles.get(key):
+                    online_profiles[key] = value
+            quick_apply_data["online_profiles"] = online_profiles
+        
+        # Ensure voluntary_identification exists
+        if not quick_apply_data.get("voluntary_identification"):
+            quick_apply_data["voluntary_identification"] = {}
+        
         profile.resume_path = str(resume_path.absolute())
         profile.resume_data = resume_data
+        
+        # Create a new dict object for quick_apply_data to ensure SQLAlchemy detects the change
+        import copy
+        from sqlalchemy.orm.attributes import flag_modified
+        profile.quick_apply_data = copy.deepcopy(quick_apply_data)
+        flag_modified(profile, "quick_apply_data")
         
         await db.commit()
         await db.refresh(profile)

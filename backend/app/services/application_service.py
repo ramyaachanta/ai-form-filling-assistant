@@ -58,9 +58,15 @@ class ApplicationService:
         if not application:
             return None
         
-        update_data = application_data.dict(exclude_unset=True)
+        # Use model_dump for Pydantic v2, or dict() for v1
+        try:
+            update_data = application_data.model_dump(exclude_unset=True)
+        except AttributeError:
+            update_data = application_data.dict(exclude_unset=True)
+        
         for field, value in update_data.items():
-            setattr(application, field, value)
+            if value is not None:
+                setattr(application, field, value)
         
         application.updated_at = datetime.utcnow()
         await db.commit()

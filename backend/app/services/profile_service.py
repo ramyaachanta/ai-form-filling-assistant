@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm.attributes import flag_modified
 from typing import List, Optional
 from app.models.profile import Profile, ProfileCreate, ProfileUpdate, ProfileResponse
 from datetime import datetime
@@ -68,7 +69,17 @@ class ProfileService:
         if not profile:
             return None
         
-        update_data = profile_data.dict(exclude_unset=True)
+        # Use model_dump for Pydantic v2, or dict() for v1
+        try:
+            # Use exclude_unset=True to only include provided fields
+            # Don't exclude None, empty lists, or empty dicts - we want to save all provided values
+            update_data = profile_data.model_dump(exclude_unset=True)
+        except AttributeError:
+            update_data = profile_data.dict(exclude_unset=True)
+        
+        # Log for debugging
+        import json
+        print(f"Update data received: {json.dumps(update_data, indent=2, default=str)}")
         
         # Handle quick apply fields separately
         quick_apply_fields = [
@@ -76,25 +87,61 @@ class ProfileService:
             "location", "education", "employment", "online_profiles", "voluntary_identification"
         ]
         
-        # Get existing quick_apply_data or initialize
-        quick_apply_data = profile.quick_apply_data or {}
+        # Get existing quick_apply_data or initialize - CREATE A NEW DICT to ensure SQLAlchemy detects the change
+        existing_quick_apply = profile.quick_apply_data or {}
+        quick_apply_data = dict(existing_quick_apply)  # Create a new dictionary
+        print(f"Existing quick_apply_data: {json.dumps(existing_quick_apply, indent=2, default=str)}")
         
         # Update quick apply fields
         for field in quick_apply_fields:
             if field in update_data:
-                quick_apply_data[field] = update_data.pop(field)
+                value = update_data.pop(field)
+                # Always update the field if it's in update_data (even if None, empty string, empty list, or empty dict)
+                # This allows clearing fields and ensures all provided data is saved
+                quick_apply_data[field] = value
+                print(f"Updated {field}: {json.dumps(value, indent=2, default=str) if isinstance(value, (dict, list)) else value}")
         
-        # Update regular fields
+        # Update regular fields (name, email, phone, address, additional_data)
         for field, value in update_data.items():
-            setattr(profile, field, value)
+            if value is not None:
+                setattr(profile, field, value)
         
-        # Update quick_apply_data JSON field
-        profile.quick_apply_data = quick_apply_data
+        # IMPORTANT: Create a completely NEW dict object (deep copy) to ensure SQLAlchemy detects the change
+        # SQLAlchemy uses object identity to detect changes, so we need a new dict object
+        import copy
+        new_quick_apply_data = copy.deepcopy(quick_apply_data)
+        profile.quick_apply_data = new_quick_apply_data
+        print(f"Final quick_apply_data (before commit): {json.dumps(profile.quick_apply_data, indent=2, default=str)}")
         
         profile.updated_at = datetime.utcnow()
-        await db.commit()
-        await db.refresh(profile)
-        return profile
+        
+        # Mark as modified - CRITICAL for JSON fields in SQLAlchemy
+        # Even with a new dict, we need to flag it as modified
+        flag_modified(profile, "quick_apply_data")
+        
+        try:
+            # Flush to ensure changes are tracked before commit
+            await db.flush()
+            print("✓ Flush successful - changes tracked")
+            
+            # Commit the transaction
+            await db.commit()
+            print("✓ Commit successful - data saved to database")
+            
+            # Refresh to get the latest data from database
+            await db.refresh(profile)
+            print(f"✓ After refresh quick_apply_data: {json.dumps(profile.quick_apply_data, indent=2, default=str)}")
+            
+            # Return the updated profile
+            return profile
+        except Exception as e:
+            print(f"✗ Error during commit: {str(e)}")
+            print(f"✗ Error type: {type(e).__name__}")
+            import traceback
+            print(f"✗ Traceback: {traceback.format_exc()}")
+            await db.rollback()
+            raise
+        
     
     @staticmethod
     async def delete_profile(db: AsyncSession, profile_id: str) -> bool:

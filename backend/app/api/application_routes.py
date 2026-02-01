@@ -64,6 +64,8 @@ async def update_application(
         raise HTTPException(status_code=403, detail="Not authorized")
     
     updated = await ApplicationService.update_application(db, application_id, application_data)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Application not found")
     return ApplicationResponse.model_validate(updated)
 
 
