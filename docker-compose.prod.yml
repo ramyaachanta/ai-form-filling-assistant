@@ -13,15 +13,15 @@ services:
     environment:
       - DEBUG=False
       - PLAYWRIGHT_HEADLESS=True
-    # Resource limits
+    # Resource limits (adjusted for free tier t3.micro)
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 2G
+          cpus: '1'  # t3.micro has 1 vCPU
+          memory: 1.5G  # Leave some for system
         reservations:
-          cpus: '1'
-          memory: 1G
+          cpus: '0.5'
+          memory: 512M
     restart: always
 
   frontend:
