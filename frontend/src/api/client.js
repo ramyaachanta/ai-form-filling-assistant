@@ -56,6 +56,24 @@ export const fillForm = async (requestData) => {
   return response.data;
 };
 
+export const checkAtsScore = async (url) => {
+  const formData = new FormData();
+  formData.append('url', url);
+  
+  const token = localStorage.getItem('auth_token');
+  const response = await axios.post(
+    `${API_BASE_URL}/api/check-ats-score`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${token}`,
+      },
+    }
+  );
+  return response.data;
+};
+
 export const checkIfFillable = async (url) => {
   const formData = new FormData();
   formData.append('url', url);
