@@ -74,6 +74,39 @@ async def preview_form(request: FillFormRequest):
         raise HTTPException(status_code=500, detail=f"Error generating preview: {str(e)}")
 
 
+@router.post("/check-ats-score")
+async def check_ats_score(
+    url: str = Form(...),
+    current_user = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Check ATS score by comparing resume with job posting"""
+    try:
+        from app.services.ats_score_service import ATSScoreService
+        
+        # Get user's profile and resume data
+        profile = await ProfileService.get_profile_by_user_id(db, current_user.id)
+        if not profile:
+            raise HTTPException(status_code=404, detail="Profile not found. Please create your profile first.")
+        
+        if not profile.resume_data:
+            return JSONResponse(content={
+                "score": 0,
+                "recommendation": "no_resume",
+                "message": "No resume uploaded. Please upload your resume first to check ATS score.",
+                "details": {}
+            })
+        
+        # Calculate ATS score
+        ats_result = await ATSScoreService.calculate_ats_score(url, profile.resume_data)
+        
+        return JSONResponse(content=ats_result)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking ATS score: {str(e)}")
+
+
 @router.post("/check-fillable")
 async def check_if_fillable(
     url: str = Form(...),
